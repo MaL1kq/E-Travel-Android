@@ -11,29 +11,41 @@
         android:padding="24dp"
         android:gravity="center_horizontal">
 
-        <!-- Foto Profil -->
+        <!-- Foto Profil Bulat -->
         <FrameLayout
             android:layout_width="120dp"
             android:layout_height="120dp"
             android:layout_marginBottom="8dp">
 
+            <!-- Default avatar huruf -->
+            <TextView
+                android:id="@+id/tvAvatarDefault"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:gravity="center"
+                android:textSize="48sp"
+                android:textStyle="bold"
+                android:textColor="#1565C0"
+                android:background="@drawable/bg_avatar_circle"
+                android:text="A"/>
+
+            <!-- Foto profil — bulat via Glide circleCrop -->
             <ImageView
                 android:id="@+id/ivFotoProfil"
                 android:layout_width="120dp"
                 android:layout_height="120dp"
-                android:src="@android:drawable/ic_menu_camera"
-                android:background="#E0E0E0"
-                android:padding="24dp"
-                android:scaleType="centerCrop"/>
+                android:scaleType="centerCrop"
+                android:visibility="gone"/>
 
+            <!-- Edit icon -->
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:layout_gravity="bottom|end"
                 android:text="✏️"
-                android:textSize="20sp"
-                android:background="#1565C0"
-                android:padding="4dp"/>
+                android:textSize="16sp"
+                android:gravity="center"
+                android:background="#1565C0"/>
         </FrameLayout>
 
         <Button
@@ -46,7 +58,6 @@
             android:textSize="13sp"
             android:layout_marginBottom="24dp"/>
 
-        <!-- Info -->
         <TextView
             android:id="@+id/tvNama"
             android:layout_width="wrap_content"
@@ -75,7 +86,6 @@
             android:paddingVertical="6dp"
             android:layout_marginBottom="32dp"/>
 
-        <!-- Nomor WhatsApp -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
@@ -29,9 +30,7 @@ class ProfilActivity : BaseActivity() {
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
                 val path = copyImageToInternal(uri)
-                if (path != null) {
-                    savePhoto(path)
-                }
+                if (path != null) savePhoto(path)
             }
         }
     }
@@ -42,7 +41,6 @@ class ProfilActivity : BaseActivity() {
         setContentView(binding.root)
         setupBackButton("Profil Saya")
 
-        val prefs = getSharedPreferences("session", MODE_PRIVATE)
         val userId = SessionManager.getUserId(this)
         val db = AppDatabase.getDatabase(this)
 
@@ -54,20 +52,29 @@ class ProfilActivity : BaseActivity() {
                 binding.tvRole.text = it.role.replaceFirstChar { c -> c.uppercase() }
                 binding.etWhatsapp.setText(it.whatsapp ?: "")
 
+                // Set default avatar huruf pertama nama
+                val firstChar = it.nama.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+                binding.tvAvatarDefault.text = firstChar
+
                 if (!it.photoPath.isNullOrEmpty()) {
+                    // Tampilkan foto, sembunyikan avatar default
+                    binding.tvAvatarDefault.visibility = View.GONE
+                    binding.ivFotoProfil.visibility = View.VISIBLE
                     Glide.with(this@ProfilActivity)
                         .load(File(it.photoPath))
-                        .circleCrop()
+                        .circleCrop()  // ← ini yang bikin bulat sempurna
                         .into(binding.ivFotoProfil)
+                } else {
+                    binding.tvAvatarDefault.visibility = View.VISIBLE
+                    binding.ivFotoProfil.visibility = View.GONE
                 }
             }
         }
 
-        // Pilih foto
         binding.btnGantiFoto.setOnClickListener { openGallery() }
         binding.ivFotoProfil.setOnClickListener { openGallery() }
+        binding.tvAvatarDefault.setOnClickListener { openGallery() }
 
-        // Simpan nomor WA
         binding.btnSimpanWa.setOnClickListener {
             val wa = binding.etWhatsapp.text.toString().trim()
             if (wa.isEmpty()) {
@@ -75,14 +82,11 @@ class ProfilActivity : BaseActivity() {
                 return@setOnClickListener
             }
             lifecycleScope.launch {
-                withContext(Dispatchers.IO) {
-                    db.userDao().updateWhatsapp(userId, wa)
-                }
+                withContext(Dispatchers.IO) { db.userDao().updateWhatsapp(userId, wa) }
                 Toast.makeText(this@ProfilActivity, "Nomor WA berhasil disimpan", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // Logout
         binding.btnLogout.setOnClickListener {
             SessionManager.logout(this, LoginActivity::class.java)
         }
@@ -93,14 +97,15 @@ class ProfilActivity : BaseActivity() {
         val db = AppDatabase.getDatabase(this)
 
         lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
-                db.userDao().updatePhoto(userId, path)
-            }
+            withContext(Dispatchers.IO) { db.userDao().updatePhoto(userId, path) }
 
-            // Update session
+            // Simpan path ke session supaya sidebar bisa load
             getSharedPreferences("session", MODE_PRIVATE)
                 .edit().putString("userPhoto", path).apply()
 
+            // Tampilkan foto bulat
+            binding.tvAvatarDefault.visibility = View.GONE
+            binding.ivFotoProfil.visibility = View.VISIBLE
             Glide.with(this@ProfilActivity)
                 .load(File(path))
                 .circleCrop()

@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
+import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.ActionBarDrawerToggle
@@ -30,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Cek session expired sebelum apapun
         if (SessionManager.isLoggedIn(this) && SessionManager.isSessionExpired(this)) {
             SessionManager.logout(this, LoginActivity::class.java)
             return
@@ -46,7 +48,7 @@ class MainActivity : AppCompatActivity() {
         setupSidebar(role)
     }
 
-    // WAJIB: Agar saat kembali dari ProfilActivity, data di Sidebar langsung update
+    // Reload sidebar setiap kembali ke MainActivity
     override fun onResume() {
         super.onResume()
         val role = getSharedPreferences("session", Context.MODE_PRIVATE)
@@ -88,11 +90,11 @@ class MainActivity : AppCompatActivity() {
         binding.drawerLayout.addDrawerListener(toggle)
         toggle.syncState()
 
-        // Styling Sidebar: Teks Hitam & Icon Original
+        // Icon sidebar pakai warna asli, teks hitam
         binding.navView.itemIconTintList = null
         binding.navView.itemTextColor = ColorStateList.valueOf(Color.parseColor("#333333"))
 
-        // Membuat Menu Logout Berwarna MERAH
+        // Warnai teks Logout jadi merah
         val logoutItem = binding.navView.menu.findItem(R.id.nav_side_logout)
         logoutItem?.let {
             val s = SpannableString(it.title)
@@ -104,25 +106,34 @@ class MainActivity : AppCompatActivity() {
 
         binding.navView.setNavigationItemSelectedListener { item ->
             when (item.itemId) {
-                R.id.nav_side_home -> binding.bottomNav.selectedItemId = R.id.nav_home
-                R.id.nav_side_destinasi -> binding.bottomNav.selectedItemId = R.id.nav_destinasi
-                R.id.nav_side_pesan -> binding.bottomNav.selectedItemId = R.id.nav_pesan
-                R.id.nav_side_profil -> startActivity(Intent(this, ProfilActivity::class.java))
-                R.id.nav_side_kelola -> binding.bottomNav.selectedItemId = R.id.nav_kelola
-                R.id.nav_side_destinasi_saya -> binding.bottomNav.selectedItemId = R.id.nav_destinasi_saya
-                R.id.nav_side_kelola_tiket -> binding.bottomNav.selectedItemId = R.id.nav_tiket
-                R.id.nav_side_request -> startActivity(Intent(this, RequestPengelolaActivity::class.java))
-                R.id.nav_side_logout -> SessionManager.logout(this, LoginActivity::class.java)
+                R.id.nav_side_home ->
+                    binding.bottomNav.selectedItemId = R.id.nav_home
+                R.id.nav_side_destinasi ->
+                    binding.bottomNav.selectedItemId = R.id.nav_destinasi
+                R.id.nav_side_pesan ->
+                    binding.bottomNav.selectedItemId = R.id.nav_pesan
+                R.id.nav_side_profil ->
+                    startActivity(Intent(this, ProfilActivity::class.java))
+                R.id.nav_side_kelola ->
+                    binding.bottomNav.selectedItemId = R.id.nav_kelola
+                R.id.nav_side_destinasi_saya ->
+                    binding.bottomNav.selectedItemId = R.id.nav_destinasi_saya
+                R.id.nav_side_kelola_tiket ->
+                    binding.bottomNav.selectedItemId = R.id.nav_tiket
+                R.id.nav_side_request ->
+                    startActivity(Intent(this, RequestPengelolaActivity::class.java))
+                R.id.nav_side_logout ->
+                    SessionManager.logout(this, LoginActivity::class.java)
             }
             binding.drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
     }
 
-    // Fungsi untuk memuat ulang Foto, Nama, dan Visibility Menu
     private fun updateSidebarData(role: String?) {
         val header = binding.navView.getHeaderView(0)
         val ivPhoto = header.findViewById<ImageView>(R.id.ivSidebarPhoto)
+        val tvAvatar = header.findViewById<TextView>(R.id.tvAvatarDefault)
         val tvNama = header.findViewById<TextView>(R.id.tvSidebarNama)
         val tvRole = header.findViewById<TextView>(R.id.tvSidebarRole)
 
@@ -133,19 +144,33 @@ class MainActivity : AppCompatActivity() {
         tvNama.text = nama
         tvRole.text = role?.replaceFirstChar { it.uppercase() }
 
+        // Set huruf pertama nama sebagai default avatar
+        tvAvatar?.text = nama?.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
         if (!photoPath.isNullOrEmpty()) {
             val imgFile = File(photoPath)
             if (imgFile.exists()) {
+                // Ada foto — sembunyikan avatar default, tampilkan foto
+                tvAvatar?.visibility = View.GONE
+                ivPhoto?.visibility = View.VISIBLE
                 Glide.with(this)
                     .load(imgFile)
                     .circleCrop()
-                    .skipMemoryCache(true) // PENTING: Paksa Glide abaikan cache memori
-                    .diskCacheStrategy(DiskCacheStrategy.NONE) // Paksa Glide abaikan cache disk
-                    .into(ivPhoto)
+                    .skipMemoryCache(true)
+                    .diskCacheStrategy(DiskCacheStrategy.NONE)
+                    .into(ivPhoto!!)
+            } else {
+                // File tidak ada — tampilkan avatar default
+                tvAvatar?.visibility = View.VISIBLE
+                ivPhoto?.visibility = View.GONE
             }
+        } else {
+            // Belum ada foto — tampilkan avatar default
+            tvAvatar?.visibility = View.VISIBLE
+            ivPhoto?.visibility = View.GONE
         }
 
-        // Visibility Sidebar Menu
+        // Visibility menu sidebar sesuai role
         val navMenu = binding.navView.menu
         navMenu.findItem(R.id.nav_side_home)?.isVisible = true
         navMenu.findItem(R.id.nav_side_destinasi)?.isVisible = true
@@ -158,11 +183,15 @@ class MainActivity : AppCompatActivity() {
         navMenu.findItem(R.id.nav_side_kelola_tiket)?.isVisible = role == "pengelola"
     }
 
+    // Simpan waktu close saat app di-background
     override fun onStop() {
         super.onStop()
-        if (SessionManager.isLoggedIn(this)) SessionManager.saveCloseTime(this)
+        if (SessionManager.isLoggedIn(this)) {
+            SessionManager.saveCloseTime(this)
+        }
     }
 
+    // Reset timer saat app aktif kembali
     override fun onStart() {
         super.onStart()
         if (SessionManager.isLoggedIn(this) && SessionManager.isSessionExpired(this)) {

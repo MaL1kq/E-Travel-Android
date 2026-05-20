@@ -43,15 +43,20 @@ class LoginActivity : BaseActivity() {
                         .putString("userRole", user.role)
                         .putString("userName", user.nama)
                         .putLong("userId", user.id)
+                        // ← tambah ini: simpan foto ke session saat login
+                        .putString("userPhoto", user.photoPath ?: "")
                         .apply()
 
-                    // Semua role ke MainActivity — nav & menu disesuaikan di sana
                     val intent = Intent(this@LoginActivity, MainActivity::class.java)
                     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     startActivity(intent)
                     finish()
                 } else {
-                    Toast.makeText(this@LoginActivity, "Email atau password salah", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this@LoginActivity,
+                        "Email atau password salah",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
