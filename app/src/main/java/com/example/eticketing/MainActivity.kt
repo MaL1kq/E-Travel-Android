@@ -13,6 +13,7 @@ import android.widget.TextView
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.bumptech.glide.Glide
@@ -20,8 +21,10 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.eticketing.activities.LoginActivity
 import com.example.eticketing.activities.ProfilActivity
 import com.example.eticketing.activities.RequestPengelolaActivity
+import com.example.eticketing.data.AppDatabase
 import com.example.eticketing.data.SessionManager
 import com.example.eticketing.databinding.ActivityMainBinding
+import kotlinx.coroutines.launch
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -31,7 +34,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Cek session expired sebelum apapun
         if (SessionManager.isLoggedIn(this) && SessionManager.isSessionExpired(this)) {
             SessionManager.logout(this, LoginActivity::class.java)
             return
@@ -46,14 +48,15 @@ class MainActivity : AppCompatActivity() {
 
         setupNavigation(role)
         setupSidebar(role)
+        setupBadge()
     }
 
-    // Reload sidebar setiap kembali ke MainActivity
     override fun onResume() {
         super.onResume()
         val role = getSharedPreferences("session", Context.MODE_PRIVATE)
             .getString("userRole", "user")
         updateSidebarData(role)
+        setupBadge()
     }
 
     private fun setupNavigation(role: String?) {
@@ -77,6 +80,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
         binding.bottomNav.setupWithNavController(navController)
+
+        // --- TAMBAHAN: Matikan tint otomatis agar selector bisa bekerja dengan warna sendiri ---
+        binding.bottomNav.itemIconTintList = null
     }
 
     private fun setupSidebar(role: String?) {
@@ -90,11 +96,9 @@ class MainActivity : AppCompatActivity() {
         binding.drawerLayout.addDrawerListener(toggle)
         toggle.syncState()
 
-        // Icon sidebar pakai warna asli, teks hitam
         binding.navView.itemIconTintList = null
         binding.navView.itemTextColor = ColorStateList.valueOf(Color.parseColor("#333333"))
 
-        // Warnai teks Logout jadi merah
         val logoutItem = binding.navView.menu.findItem(R.id.nav_side_logout)
         logoutItem?.let {
             val s = SpannableString(it.title)
@@ -130,6 +134,28 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupBadge() {
+        val userId = getSharedPreferences("session", Context.MODE_PRIVATE)
+            .getLong("userId", -1L)
+        if (userId == -1L) return
+
+        val db = AppDatabase.getDatabase(this)
+
+        lifecycleScope.launch {
+            db.messageDao().getUnreadCount(userId).collect { count ->
+                if (count > 0) {
+                    val badge = binding.bottomNav.getOrCreateBadge(R.id.nav_pesan)
+                    badge.isVisible = true
+                    badge.number = count
+                    badge.backgroundColor = Color.RED
+                    badge.badgeTextColor = Color.WHITE
+                } else {
+                    binding.bottomNav.removeBadge(R.id.nav_pesan)
+                }
+            }
+        }
+    }
+
     private fun updateSidebarData(role: String?) {
         val header = binding.navView.getHeaderView(0)
         val ivPhoto = header.findViewById<ImageView>(R.id.ivSidebarPhoto)
@@ -144,13 +170,11 @@ class MainActivity : AppCompatActivity() {
         tvNama.text = nama
         tvRole.text = role?.replaceFirstChar { it.uppercase() }
 
-        // Set huruf pertama nama sebagai default avatar
         tvAvatar?.text = nama?.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
 
         if (!photoPath.isNullOrEmpty()) {
             val imgFile = File(photoPath)
             if (imgFile.exists()) {
-                // Ada foto — sembunyikan avatar default, tampilkan foto
                 tvAvatar?.visibility = View.GONE
                 ivPhoto?.visibility = View.VISIBLE
                 Glide.with(this)
@@ -160,17 +184,14 @@ class MainActivity : AppCompatActivity() {
                     .diskCacheStrategy(DiskCacheStrategy.NONE)
                     .into(ivPhoto!!)
             } else {
-                // File tidak ada — tampilkan avatar default
                 tvAvatar?.visibility = View.VISIBLE
                 ivPhoto?.visibility = View.GONE
             }
         } else {
-            // Belum ada foto — tampilkan avatar default
             tvAvatar?.visibility = View.VISIBLE
             ivPhoto?.visibility = View.GONE
         }
 
-        // Visibility menu sidebar sesuai role
         val navMenu = binding.navView.menu
         navMenu.findItem(R.id.nav_side_home)?.isVisible = true
         navMenu.findItem(R.id.nav_side_destinasi)?.isVisible = true
@@ -183,15 +204,11 @@ class MainActivity : AppCompatActivity() {
         navMenu.findItem(R.id.nav_side_kelola_tiket)?.isVisible = role == "pengelola"
     }
 
-    // Simpan waktu close saat app di-background
     override fun onStop() {
         super.onStop()
-        if (SessionManager.isLoggedIn(this)) {
-            SessionManager.saveCloseTime(this)
-        }
+        if (SessionManager.isLoggedIn(this)) SessionManager.saveCloseTime(this)
     }
 
-    // Reset timer saat app aktif kembali
     override fun onStart() {
         super.onStart()
         if (SessionManager.isLoggedIn(this) && SessionManager.isSessionExpired(this)) {
